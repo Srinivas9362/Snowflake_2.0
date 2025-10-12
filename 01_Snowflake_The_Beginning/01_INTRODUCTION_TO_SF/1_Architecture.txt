@@ -1,0 +1,170 @@
+|
+2️⃣ Cloud Data Warehousing Basics
+
+Traditional vs Cloud DW:Phase 1: Fundamentals (Zero to Beginner)
+1️⃣ Introduction to Snowflake
+
+What is Snowflake?
+Snowflake is a cloud-based data warehouse platform. Unlike traditional on-premises warehouses, Snowflake is fully managed and built for scalability, elasticity, and performance.
+
+Key features:
+
+Cloud-native: runs on AWS, Azure, GCP
+
+Fully managed: no hardware or software maintenance
+
+Handles structured and semi-structured data (JSON, Avro, Parquet)
+
+Elastic compute: separate storage and compute
+
+Automatic scaling and optimization
+
+Real-time example:
+A company collects web clickstream data, customer purchases, and JSON-based API data. Snowflake allows storing all this data centrally, querying it with SQL, and scaling up compute during peak analytics hours without downtime.
+
+
+ Feature              | Traditional DW | Cloud DW (Snowflake) |
+| -------------------- | -------------- | -------------------- |
+| Storage & Compute    | Coupled        | Separated            |
+| Scaling              | Limited        | Auto-scaling         |
+| Maintenance          | High           | Low (Managed)        |
+| Semi-structured data | Hard           | Easy (VARIANT type)  |
+
+Use case:
+Marketing team wants to run analytics on social media ads and website logs. They need fast queries on huge datasets and pay only for compute used, Snowflake solves this perfectly.
+
+
+3️⃣ Why Snowflake?
+
+Snowflake Architecture:
+
+Separation of Storage & Compute
+
+Storage: Centralized cloud storage (S3, Azure Blob, GCS)
+
+Compute: Virtual warehouses for query processing
+
+Each can scale independently.
+
+Automatic optimization
+
+Micro-partitioning
+
+Caching query results
+
+Concurrency
+
+Multiple virtual warehouses can query same data simultaneously without blocking.
+
+Editions & Pricing:
+
+Standard, Enterprise, Business Critical, Virtual Private Snowflake
+
+Pricing based on:
+
+Storage used (per TB/month)
+
+Compute usage (per second)
+
+4️⃣ Snowflake Architecture in Detail
+
+Layers:
+
+Database Storage Layer
+
+Stores structured and semi-structured data
+
+Automatically compressed and optimized
+
+Compute Layer (Virtual Warehouses)
+
+Processes queries
+
+Can pause/resume to save cost
+
+Cloud Services Layer
+
+Authentication, metadata, query optimization, security
+
+Micro-partitioning & Clustering:
+
+Data stored in micro-partitions (~16 MB each)
+
+Automatically clustered by Snowflake
+
+Clustering keys can be defined for faster range queries
+
+Storage vs Compute Separation:
+
+You can run multiple virtual warehouses on same data without interference.
+
+Example: Finance team queries historical transactions while Marketing team runs ad analytics.
+
+6️⃣ Basic SQL in Snowflake
+6.1 Creating Databases, Schemas, Tables
+-- Create database
+CREATE DATABASE mydb;
+
+-- Create schema
+CREATE SCHEMA myschema;
+
+-- Create table
+CREATE TABLE employees (
+    emp_id INT,
+    emp_name STRING,
+    emp_salary FLOAT,
+    emp_data VARIANT
+);
+
+
+6.2 Data Types
+Type	Description
+STRING	Text
+NUMBER	Numeric
+FLOAT	Decimal
+BOOLEAN	True/False
+DATE/TIMESTAMP	Date/Time
+VARIANT	Semi-structured JSON/Avro/Parquet
+ARRAY	JSON array
+OBJECT	JSON object
+
+Example JSON in VARIANT:
+
+INSERT INTO employees(emp_id, emp_name, emp_data)
+VALUES (1, 'Alice', PARSE_JSON('{"age":30,"skills":["Python","SQL"]}'));
+
+6.3 Basic DML
+
+INSERT
+
+INSERT INTO employees(emp_id, emp_name, emp_salary)
+VALUES (2, 'Bob', 45000);
+
+
+SELECT
+
+SELECT * FROM employees;
+SELECT emp_name, emp_salary FROM employees WHERE emp_salary > 40000;
+
+
+UPDATE
+
+UPDATE employees
+SET emp_salary = emp_salary + 5000
+WHERE emp_name = 'Bob';
+
+
+DELETE
+
+DELETE FROM employees
+WHERE emp_id = 2;
+
+6.4 Querying JSON/VARIANT Data
+-- Fetch JSON object field
+SELECT emp_data:age AS age,
+       emp_data:skills[0] AS first_skill
+FROM employees;
+
+
+Real-time use case:
+A healthcare company stores patient sensor readings as JSON in VARIANT. You can query a specific reading directly without flattening.
