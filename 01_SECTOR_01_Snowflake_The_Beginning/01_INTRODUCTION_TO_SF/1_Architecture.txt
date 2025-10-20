@@ -23,6 +23,15 @@ Real-time example:
 A company collects web clickstream data, customer purchases, and JSON-based API data. Snowflake allows storing all this data centrally, querying it with SQL, and scaling up compute during peak analytics hours without downtime.
 
 
+
+| 🔧 Feature           | 🏢 Traditional DW | ☁️ Snowflake (Cloud DW) |
+| -------------------- | ----------------- | ----------------------- |
+| Storage & Compute    | Coupled           | Separated               |
+| Scaling              | Limited           | Auto-scaling            |
+| Maintenance          | High              | Fully Managed           |
+| Semi-structured Data | Complex           | Simple (VARIANT type)   |
+
+
  Feature              | Traditional DW | Cloud DW (Snowflake) |
 | -------------------- | -------------- | -------------------- |
 | Storage & Compute    | Coupled        | Separated            |
