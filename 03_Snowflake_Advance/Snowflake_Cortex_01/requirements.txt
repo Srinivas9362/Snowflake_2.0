@@ -1,0 +1,16 @@
+🧩 Project Overview
+🎯 Goal
+
+Build a small project that:
+
+Stores patient feedback (unstructured text) and hospital service details (structured data) in Snowflake.
+
+Uses Snowflake Cortex to analyze:
+
+Sentiment of feedback (positive/negative)
+
+Summaries of long feedback
+
+Topic extraction (issues, compliments)
+
+Allows querying results using SQL and Cortex functions.
