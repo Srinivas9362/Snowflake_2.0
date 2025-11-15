@@ -1,0 +1,232 @@
+🎯 Snowflake Micro-Partition Visual Diagram
+1️⃣ How Snowflake Stores Tables Physically
+┌───────────────────────────────┐
+│       SNOWFLAKE TABLE         │
+└───────────────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────────────────┐
+│ Table is automatically broken into           │
+│ 16 MB MICRO-PARTITIONS                       │
+└──────────────────────────────────────────────┘
+
+2️⃣ Micro-Partition Layout (Example)
+                Snowflake Storage Layer
+┌─────────────────────────────────────────────────────────────┐
+│  MICRO-PARTITIONS (Immutable, 16MB each)                    │
+│                                                             │
+│  ┌────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ MP1        │ │ MP2          │ │ MP3          │ ...       │
+│  │------------│ │--------------│ │--------------│           │
+│  │ DATE: 1-10 │ │ DATE: 11-20  │ │ DATE: 21-30  │           │
+│  │ Region A   │ │ Region A/B   │ │ Region B     │           │
+│  └────────────┘ └──────────────┘ └──────────────┘           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
+Each micro-partition contains:
+
+Columnar data
+
+Min/max values for each column
+
+Metadata
+
+Zone map statistics
+
+Compression metadata
+
+This metadata is key to pruning.
+
+🧠 3️⃣ How Pruning Works (Visually)
+
+Suppose your table is clustered by DATE.
+
+Your query:
+
+SELECT * 
+FROM SALES 
+WHERE DATE = '2024-10-25';
+
+❌ Without Clustering (Bad / Random Inserts)
+Snowflake must scan ALL micro-partitions
+
+┌──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+│ MP1  │ MP2  │ MP3  │ MP4  │ MP5  │ MP6  │ MP7  │  → 7 MPs scanned
+└──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+
+✔ With Clustering (Good)
+Snowflake prunes the MPs that don’t contain matching dates
+Only 1 MP scanned
+
+┌──────┬──────┬──────────┬──────┬──────┬──────┬──────┐
+│ MP1  │ MP2  │ **MP3 ✔** │ MP4  │ MP5  │ MP6  │ MP7  │
+└──────┴──────┴──────────┴──────┴──────┴──────┴──────┘
+
+
+This is clustering efficiency → fewer partitions scanned.
+
+🔎 4️⃣ Micro-Partition Overlap (Why Clustering Fails)
+
+Overlap happens when micro-partitions contain mixed ranges.
+
+❌ Overlap Example (Bad)
+Micro-partitions contain overlapping date ranges:
+
+MP1: 1–15  
+MP2: 10–25  
+MP3: 20–30  
+
+
+Query:
+
+WHERE DATE = 12
+
+
+Snowflake must scan MP1 AND MP2 AND MP3 → bad pruning.
+
+✔ Good Example (Non-overlap)
+MP1: 1–10  
+MP2: 11–20  
+MP3: 21–30  
+
+
+Query for DATE=12 scans only MP2 → excellent pruning.
+
+🧩 5️⃣ Clustering Key Effect (Visual)
+Before Clustering (Random Inserts → Chaos)
+MP1: Dates = 5,98,40
+MP2: Dates = 10,60,13
+MP3: Dates = 90,12,55
+MP4: Dates = 70,20,30
+
+
+Query:
+
+WHERE DATE BETWEEN 10 AND 20
+
+
+Snowflake must scan all 4 MPs → expensive.
+
+After Clustering (Organized Partitions)
+MP1: 1–10
+MP2: 11–20
+MP3: 21–30
+MP4: 31–40
+
+
+Query:
+
+WHERE DATE BETWEEN 10 AND 20
+
+
+Snowflake scans only MP1 + MP2 → cheap & fast.
+
+🧨 6️⃣ FULL MICRO-PARTITION DIAGRAM (Interview-Friendly)
+
+Here is a complete visualization you can draw in interviews:
+
+Snowflake Table
+        |
+        ▼
+┌──────────────────────────────────────┐
+│   Automatic Micro-Partitioning       │
+└──────────────────────────────────────┘
+        |
+        ▼
+
+┌────────────┬────────────┬────────────┬────────────┬────────────┐
+│  MP1       │  MP2       │  MP3       │  MP4       │  MP5       │
+├────────────┼────────────┼────────────┼────────────┼────────────┤
+│ Date 1–10  │ Date 11–20 │ Date 21–30 │ Date 31–40 │ Date 41–50 │
+│ Region A   │ Region A/B │ Region B   │ Region B   │ Region C   │
+└────────────┴────────────┴────────────┴────────────┴────────────┘
+
+Query: WHERE DATE = 27
+→ Only MP3 scanned
+→ Low bytes scanned
+→ High pruning efficiency
+
+🏆 7️⃣ EXACT Interview Answer (Use this)
+
+“Snowflake stores table data in immutable 16MB micro-partitions with metadata like min/max values.
+If partitions have no overlap on the filtering column, Snowflake prunes most partitions — scanning only the relevant ones.
+High overlap means Snowflake must scan many partitions, which increases bytes scanned and decreases performance.
+Clustering improves pruning by organizing micro-partitions into ordered ranges with minimal overlap.”
+
+
+---
+✅ 2. Query Profile – What You Must Check
+Look at these fields in the profile:
+Metric	Meaning	Good	Bad
+Partitions scanned	Micro-partitions Snowflake had to touch	Low	High
+Bytes scanned	Data actually read	Small	Huge
+Scan progress	How much of table scanned	<20%	~100%
+Remote I/O	Reads from disk (slow)	Low	High
+Local cache hit	Read from cache	High	Low
+✅ 3. SYSTEM$CLUSTERING_INFORMATION Metrics
+Field	Meaning	Good	Bad
+average_overlaps	MP overlap	0–0.20	>0.50
+average_depth	MP fragmentation	<3	>5
+total_partition_count	# of MP	Depends	Only for analysis
+constant partition count	zero-range MPs	0	>20 (bad)
+🎯 What “Poor Clustering” Looks Like (Interview Example)
+
+Bad example:
+
+Partitions scanned: 4250 / 4300
+Bytes scanned: 350GB
+Scan progress: 97%
+Cache usage: 12%
+average_overlaps: 1.8
+average_depth: 9
+
+
+Interpretation:
+
+Almost every micro-partition scanned → terrible pruning
+
+High overlap → meaningless clustering
+
+High depth → fragmented
+
+Cache % low → expensive
+
+🎯 What “Great Clustering” Looks Like (Interview Example)
+
+Good example:
+
+Partitions scanned: 180 / 4300
+Bytes scanned: 11GB
+Scan progress: 7%
+Cache usage: 99%
+average_overlaps: 0.12
+average_depth: 2
+
+
+Interpretation:
+
+Pruning 96% of the table
+
+Very low data scanning
+
+Cache returning most data
+
+Clustering healthy
+
+🏆 EXACT INTERVIEW ANSWER (Use this)
+
+“Good pruning means Snowflake only scans the micro-partitions that contain relevant data.
+We measure this through metrics like low partitions scanned, low bytes scanned, low scan progress, and high cache usage.
+Poor pruning shows the opposite and usually happens due to high micro-partition overlap or poor clustering.”
+
+✅ 4. Pruning Performance Formula (Easy to Remember)
+Effective Pruning = 
+( Low partitions scanned + 
+  Low bytes scanned + 
+  High cache % ) 
+÷ High total table size
+
+
+This is what interviewers expect.

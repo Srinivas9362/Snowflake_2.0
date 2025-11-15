@@ -1,0 +1,545 @@
+🧩 Concept Overview: Snowflake Tables
+What are Tables?
+
+A table in Snowflake is a structured object that stores data in rows and columns, just like in any relational database.
+However, Snowflake’s tables are logical constructs — data is physically stored in micro-partitions inside compressed cloud storage managed by Snowflake.
+
+Why are Tables Important?
+
+Tables are the core unit of storage in Snowflake.
+They enable structured querying, analytics, and data transformations while benefiting from:
+
+Automatic clustering
+
+Micro-partition pruning
+
+Time Travel
+
+Zero-copy cloning
+
+Data sharing
+
+Where Are Tables Used?
+
+They are used in all layers of a Data Engineering pipeline:
+
+Layer	Purpose	Table Type Example
+Raw Layer	Store ingested raw data	Transient table
+Staging Layer	Temporary transformations	Temporary table
+Curated Layer	Clean, business-ready data	Permanent table
+⚙️ Table Hierarchy Diagram
+Account
+ └── Database
+      └── Schema
+           └── Tables
+                ├── Permanent
+                ├── Transient
+                └── Temporary
+
+💡 Types of Tables in Snowflake
+Type	Persistence	Time Travel	Fail-Safe	Use Case
+Permanent	Stored permanently	Up to 90 days	Yes (7 days)	Production & audited data
+Transient	Short-term storage	Up to 1 day	No	Staging / temporary workloads
+Temporary	Session-based	Until session ends	No	Scratch or dev data
+🧾 SQL Syntax & Examples
+1️⃣ Create a Permanent Table
+CREATE OR REPLACE TABLE EMPLOYEES (
+  EMP_ID INT AUTOINCREMENT,
+  EMP_NAME STRING,
+  DEPARTMENT STRING,
+  SALARY NUMBER(10,2),
+  JOIN_DATE DATE
+);
+
+
+✅ Explanation:
+
+AUTOINCREMENT auto-generates unique IDs.
+
+Default type is PERMANENT if not specified.
+
+2️⃣ Create a Transient Table
+CREATE OR REPLACE TRANSIENT TABLE STG_SALES (
+  SALE_ID INT,
+  PRODUCT STRING,
+  AMOUNT NUMBER(10,2),
+  REGION STRING
+);
+
+
+🧠 Why Transient?
+Used for staging — cheaper storage, no Fail-safe.
+
+3️⃣ Create a Temporary Table
+CREATE TEMPORARY TABLE TMP_USER_SESSION (
+  USER_ID STRING,
+  LOGIN_TIME TIMESTAMP,
+  DEVICE_TYPE STRING
+);
+
+
+🕒 Lifetime: Exists only within the current session.
+
+4️⃣ Insert Data
+INSERT INTO EMPLOYEES (EMP_NAME, DEPARTMENT, SALARY, JOIN_DATE)
+VALUES 
+('John Doe', 'HR', 55000, '2023-01-10'),
+('Jane Smith', 'Finance', 72000, '2022-09-15');
+
+5️⃣ View Data
+SELECT * FROM EMPLOYEES;
+
+6️⃣ Clone a Table (Zero Copy Clone)
+
+Snowflake allows cloning without duplicating data.
+
+CREATE OR REPLACE TABLE EMPLOYEES_CLONE CLONE EMPLOYEES;
+
+
+🧠 Internally: Uses metadata pointers; no new data copied until changes occur (Copy-on-write).
+
+7️⃣ Drop and Undrop Table
+-- Drop
+DROP TABLE EMPLOYEES;
+
+-- Undrop (within time travel window)
+UNDROP TABLE EMPLOYEES;
+
+
+⚠️ Permanent tables only support Undrop (Transient/Temp do not).
+
+8️⃣ Rename a Table
+ALTER TABLE EMPLOYEES RENAME TO EMPLOYEES_MASTER;
+
+9️⃣ Grant Privileges on Tables
+-- Grant select and insert privileges
+GRANT SELECT, INSERT ON TABLE EMPLOYEES TO ROLE ANALYST_ROLE;
+
+-- Grant ownership
+GRANT OWNERSHIP ON TABLE EMPLOYEES TO ROLE DATA_ENGINEER_ROLE REVOKE CURRENT GRANTS;
+
+🔍 10️⃣ Metadata & Monitoring
+Check Tables in a Schema
+SHOW TABLES IN SCHEMA MY_DB.PUBLIC;
+
+Check Table Details
+DESCRIBE TABLE EMPLOYEES;
+
+Check via INFORMATION_SCHEMA
+SELECT * FROM MY_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EMPLOYEES';
+
+Check Storage & Usage via ACCOUNT_USAGE
+SELECT * 
+FROM SNOWFLAKE.ACCOUNT_USAGE.TABLE_STORAGE_METRICS 
+WHERE TABLE_NAME = 'EMPLOYEES'
+ORDER BY START_TIME DESC;
+
+🧰 Admin Commands & Verification
+Task	Command
+List all tables in the account	SHOW TABLES IN ACCOUNT;
+View Time Travel retention	SHOW PARAMETERS LIKE 'DATA_RETENTION_TIME_IN_DAYS' IN TABLE EMPLOYEES;
+View clone lineage	SELECT * FROM TABLE(SNOWFLAKE.ACCOUNT_USAGE.CLONE_HISTORY);
+Check who owns the table	SHOW GRANTS ON TABLE EMPLOYEES;
+🧠 Interview + Real-World Questions
+Question	Answer
+What’s the difference between transient and temporary tables?	Transient tables persist beyond sessions, temporary tables don’t.
+How does cloning save cost?	Uses metadata pointers (no data duplication).
+Can we time travel on transient tables?	Yes, but only up to 1 day.
+How to check table creation date?	Use INFORMATION_SCHEMA.TABLES.
+What happens if I clone a table and drop the source?	Clone remains intact.
+Does cloning duplicate storage?	No, until data is changed.
+How does Snowflake store tables physically?	Data is stored in compressed micro-partitions (16MB each).
+Can we share transient/temporary tables?	No, only permanent tables can be shared.
+How to check who has access to a table?	SHOW GRANTS ON TABLE tablename;
+Difference between DROP and TRUNCATE?	DROP removes metadata; TRUNCATE keeps structure.
+⚙️ Mini Project: Table Lifecycle Simulation
+🎯 Goal:
+
+Simulate how tables behave with different persistence levels and cloning.
+
+Step 1 — Create Base Table
+CREATE OR REPLACE TABLE SALES_MASTER (
+  ORDER_ID INT,
+  AMOUNT NUMBER(10,2),
+  REGION STRING
+);
+INSERT INTO SALES_MASTER VALUES (1,5000,'US'),(2,3000,'UK'),(3,4000,'CA');
+
+Step 2 — Clone the Table
+CREATE TABLE SALES_CLONE CLONE SALES_MASTER;
+
+Step 3 — Update Original Table
+UPDATE SALES_MASTER SET AMOUNT = 9999 WHERE ORDER_ID = 1;
+
+Step 4 — Compare
+SELECT * FROM SALES_MASTER;
+SELECT * FROM SALES_CLONE;
+
+
+➡️ You’ll see Sales_Clone remains unchanged — zero-copy clone proof.
+
+Step 5 — Drop & Undrop
+DROP TABLE SALES_MASTER;
+UNDROP TABLE SALES_MASTER;
+
+💰 Cost, Performance, and Security Notes
+Factor	Description
+Storage Cost	Billed per compressed TB; Transient/Temp avoid Fail-safe (cheaper).
+Compute Cost	Charged when querying or loading data.
+Cloning Cost	Metadata only — near-zero cost.
+Security	Managed via Role-Based Access Control (RBAC).
+Performance	Micro-partition pruning and clustering optimize reads.
+📋 Summary / Cheat Sheet
+Operation	Syntax
+Create Table	`CREATE [TRANSIENT
+Clone Table	CREATE TABLE clone_name CLONE source_table;
+Drop Table	DROP TABLE table_name;
+Undrop Table	UNDROP TABLE table_name;
+Rename Table	ALTER TABLE old_name RENAME TO new_name;
+Show Tables	SHOW TABLES IN SCHEMA schema_name;
+Describe Table	DESCRIBE TABLE table_name;
+Grant Privileges	GRANT SELECT ON TABLE TO ROLE;
+✅ Summary: What You Learned
+
+Snowflake’s logical vs physical table storage model
+
+Types of tables (Permanent, Transient, Temporary)
+
+Time Travel, Fail-safe, and Cloning
+
+Granting privileges and managing ownership
+
+Monitoring via INFORMATION_SCHEMA and ACCOUNT_USAGE
+
+Mini project on lifecycle management
+
+--NOTES
+-- 🎯 4. What GOOD Performance Statistics Look Like (Real Example)
+
+-- Here is how a perfectly clustered FACT table might look:
+
+-- Scan progress: 3%
+-- Bytes scanned: 400MB
+-- Percentage scanned from cache: 98%
+-- Bytes written to result: 2MB
+-- Partitions scanned: 500
+-- Partitions total: 15,000
+
+--
+🎯 Final Interview Summary Answer
+
+If you want top performance in Snowflake:
+
+Reduce:
+
+Partitions scanned 🟥
+
+Bytes scanned 🟥
+
+Scan progress (less than 100%) 🟥
+
+Remote Disk I/O 🟥
+
+Increase:
+
+Percentage scanned from cache 🟩
+
+Pruning efficiency 🟩
+
+Clustering is good when:
+
+Partitions scanned << Partitions total
+Bytes scanned is very low
+Scan progress < 20%
+
+
+Poor clustering is shown by:
+
+High micro-partition overlap
+High partitions scanned
+Low pruning efficiency
+Scan progress = 100% (for filtered queries)
+
+
+--Below is the perfect, crisp, interview-ready answer with:
+
+✅ A real table example
+✅ Before & after clustering comparison
+✅ A 30-second PERFECT interview explanation
+⭐ REAL TABLE EXAMPLE: BEFORE vs AFTER CLUSTERING
+
+Assume a FACT table:
+
+SALES (2 TB)
+Columns: SALE_DATE, REGION, PRODUCT_ID, AMOUNT
+Rows: 12 billion
+
+
+You run a query:
+
+SELECT SUM(amount)
+FROM sales
+WHERE sale_date BETWEEN '2024-01-01' AND '2024-01-31';
+
+❌ BEFORE CLUSTERING (Poor Pruning)
+
+Statistics:
+
+Scan progress: 89%
+Bytes scanned: 1.7 TB
+Partitions scanned: 28,000
+Partitions total: 31,000
+% scanned from cache: 14%
+Remote I/O: 63%
+
+
+Explanation:
+
+Snowflake had to scan almost the entire table
+
+Micro-partitions overlapped heavily
+
+Very little pruning
+
+Very high cost and time
+
+✔ AFTER CLUSTERING (Good Pruning)
+
+Clustering key:
+
+ALTER TABLE SALES CLUSTER BY (SALE_DATE);
+
+
+Statistics now:
+
+Scan progress: 4%
+Bytes scanned: 95 GB
+Partitions scanned: 1,100
+Partitions total: 31,000
+% scanned from cache: 96%
+Remote I/O: 7%
+
+
+Explanation:
+
+Snowflake skips 96% of table
+
+Scan drops from 1.7 TB → 95 GB
+
+Query executes 10–20x faster
+
+Compute cost drops massively
+
+📌 WHAT CHANGED?
+Component	Before	After	Improvement
+Scan Progress	89%	4%	🔥 MUCH lower
+Bytes Scanned	1.7 TB	95 GB	🔥 18× less
+Partitions Scanned	28,000	1,100	🔥 huge pruning
+Remote Disk I/O	63%	7%	🔥 more cached
+Cache Hit	14%	96%	🔥 faster execution
+🎯 30-SECOND PERFECT INTERVIEW ANSWER
+
+"Poor clustering is shown by high micro-partition overlap, which results in scanning a large number of partitions and scanning high bytes. In other words, if Scan Progress is high (close to 100%), Bytes Scanned is large, and Partitions Scanned is close to total partitions, then pruning is poor and clustering is ineffective.
+Good clustering is the opposite — Snowflake prunes most partitions. You should see very low scan progress (<20%), very few partitions scanned, and significantly smaller bytes scanned."
+
+⭐ SUPER STAR ANSWER (BEST OF ALL)
+
+If you want to impress the interviewer:
+
+**"Better performance always shows:
+
+Low partitions scanned
+
+Low bytes scanned
+
+Low scan progress
+
+High cache usage
+These metrics directly indicate strong micro-partition pruning and effective clustering.
+Poor performance shows the reverse: the engine must scan almost all partitions because the clustering key does not align with the predicate being used."**
+
+
+✅ 1. Clustering INTERVIEW CHEAT SHEET (Answer in 20 seconds)
+Q: What indicates poor clustering?
+
+A:
+
+High micro-partition overlap
+
+High bytes scanned
+
+High scan progress (~100%)
+
+Partitions scanned ≈ partitions total
+
+Low cache usage
+
+Long execution time
+
+Q: What indicates good clustering?
+
+A:
+
+Low overlap
+
+Very low bytes scanned
+
+Very low scan progress (<10–20%)
+
+Partitions scanned ≪ partitions total
+
+High cache usage (>90%)
+
+Q: When should you add a clustering key?
+
+A:
+Add clustering when:
+
+Table is large (>50–100M rows)
+
+Table is frequently queried on the same column(s)
+
+You see poor pruning (high bytes scanned)
+
+Natural ordering breaks due to random inserts/updates
+
+Q: What columns make good clustering keys?
+
+A:
+Columns that:
+
+Appear in WHERE, JOIN, GROUP BY
+
+Have medium–high cardinality
+
+Are incremental over time (DATE, ID, TIMESTAMP)
+
+✅ 2. Real-world Clustering Key Examples
+✔ Fact table (date based)
+CLUSTER BY (SALE_DATE)
+
+✔ Log or events table
+CLUSTER BY (EVENT_DATE, USER_ID)
+
+✔ Geo data
+CLUSTER BY (COUNTRY, REGION)
+
+✔ IoT streaming table
+CLUSTER BY (DEVICE_ID, EVENT_TS)
+
+✔ JSON / VARIANT data
+CLUSTER BY (VARIANT_COLUMN:key::string)
+
+✅ 3. How to Check Clustering Efficiency
+Option 1: Table level
+SELECT SYSTEM$CLUSTERING_INFORMATION('DB.SCHEMA.TABLE');
+
+
+Key fields:
+
+Field	Meaning
+average_overlaps	Lower = better pruning
+total_partition_count	Total micro-partitions
+partition_depth_histogram	Deeper = more fragmented
+clustering_errors	Should be empty
+Option 2: Query level (best way)
+
+Check the Query Profile:
+
+Focus on these:
+① Partitions Scanned
+Low = great pruning  
+High = poor clustering
+
+② Bytes Scanned
+<1% of table = excellent  
+>50% = very poor
+
+③ Scan Progress
+Goal: Very low  
+Bad: Close to 100%
+
+④ Remote I/O
+High I/O = poor clustering  
+Low I/O = better pruning and cache hits
+
+✅ 4. Perfect Example: Poor vs Good Clustering
+❌ BEFORE (Poor)
+Scan progress: 92%
+Partitions scanned: 28,000 / 30,000
+Bytes scanned: 1.7 TB
+Cache hits: 5%
+Overlap: High
+
+
+Meaning:
+
+Engine scanned almost the whole table → Very expensive and slow.
+
+✔ AFTER (Good)
+Scan progress: 4%
+Partitions scanned: 1,200 / 30,000
+Bytes scanned: 95 GB
+Cache hits: 98%
+Overlap: Low
+
+
+Meaning:
+
+Snowflake pruned 96% of data → Query is fast and cheap.
+
+✅ 5. How to Fix Poor Clustering
+Step 1 — Identify clustering columns
+SELECT * FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY())
+WHERE BYTES_SCANNED > 100 * 1024 * 1024;  -- >100MB
+
+
+Find most common WHERE columns.
+
+Step 2 — Apply clustering
+ALTER TABLE MYTABLE CLUSTER BY (COMMON_FILTER_COLUMN);
+
+Step 3 — Recluster
+
+(Snowflake automatically reclusters now — but you can force)
+
+ALTER TABLE MYTABLE RECLUSTER;
+
+✅ 6. How to Reduce Storage & Compute Cost
+✔ Use clustering only for big tables
+
+Avoid clustering small tables (<50M rows).
+
+✔ Choose the RIGHT clustering key
+
+Bad keys → cost increases
+Good keys → cost decreases
+
+✔ Use incremental clustering columns
+
+DATE, ID, SEQUENCE
+(because Snowflake loads micro-partitions in order)
+
+✔ Avoid too many clustering columns
+
+Limit to:
+
+1 or 2 columns max
+
+✔ Avoid clustering on low cardinality columns
+
+Example of BAD:
+
+CLUSTER BY (GENDER)       -- only M/F
+CLUSTER BY (STATUS_CODE)  -- only 5 values
+
+✔ Avoid RANDOM inserts for a DATE clustered table
+
+Random writes destroy clustering.
+
+✅ 7. "Gold Level" Interview Answer (Guaranteed Selection)
+
+“Good clustering means Snowflake can prune unnecessary micro-partitions.
+This appears as low bytes scanned, low partitions scanned, low scan progress, and high cache usage.
+Poor clustering shows the opposite — high micro-partition overlap and heavy scanning of the entire table.
+We fix this by choosing the right clustering key, monitoring query profiles, and ensuring that the table is large enough to benefit from clustering.”
