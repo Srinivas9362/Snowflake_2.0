@@ -1,0 +1,357 @@
+📌 1. What is COPY Command in Snowflake?
+
+COPY INTO is Snowflake’s main command for loading data into tables or unloading data to stages.
+
+Snowflake implements the load as:
+
+Massively parallel workers reading multiple files simultaneously
+
+Each file becomes micro-batches
+
+Automatic transactions, dedup, schema coercion, file tracking
+
+Copy operations can be:
+
+1️⃣ COPY INTO Table → Load data (CSV, JSON, Parquet, AVRO, ORC, XML)
+2️⃣ COPY INTO Location (stage/S3) → Unload data
+🧩 2. COPY INTO TABLE — Full Syntax
+COPY INTO <table_name>
+FROM <stage_path_or_query>
+FILE_FORMAT = (TYPE = CSV …)
+PATTERN = '.*.csv'
+ON_ERROR = CONTINUE
+PURGE = TRUE
+VALIDATION_MODE = RETURN_ERRORS
+FORCE = FALSE
+MATCH_BY_COLUMN_NAME = CASE_SENSITIVE
+TRUNCATECOLUMNS = TRUE
+NULL_IF = ('NULL','', 'N/A')
+EMPTY_FIELD_AS_NULL = TRUE
+FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+;
+
+🔥 3. CORE COPY INTO PARAMETERS (Most Asked in Certification)
+
+Below are the parameters you MUST know.
+
+⭐ 3.1 FILE_FORMAT
+
+Defines how files are parsed.
+
+Example:
+
+FILE_FORMAT = (TYPE = CSV SKIP_HEADER = 1 FIELD_DELIMITER = ',' FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+
+
+You can also reference a named file format:
+
+FILE_FORMAT = (FORMAT_NAME = 'my_csv_ff')
+
+⭐ 3.2 PATTERN (very important)
+
+Loads only matching files.
+
+PATTERN = '.*2024.*[.]csv'
+
+
+Use PATTERN to avoid duplicates.
+
+⭐ 3.3 ON_ERROR — Critical for loading behavior
+Value	Meaning
+ABORT_STATEMENT	❌ Stops load if ANY error happens (default)
+CONTINUE	⚠️ Skip bad rows and continue
+SKIP_FILE	❌ Skip entire file on first error
+SKIP_FILE_<n>	Skip entire file after n errors
+SKIP_FILE_PERCENTAGE	Skip file if error % > threshold
+
+Example:
+
+ON_ERROR = CONTINUE;
+
+⭐ 3.4 VALIDATION_MODE — Validation WITHOUT loading
+Mode	Use
+RETURN_ERRORS	Return only errors
+RETURN_ALL_ERRORS	Return ALL row errors
+RETURN_n_ROWS	Returns sample rows
+
+Example:
+
+COPY INTO mytable
+FROM @stage
+VALIDATION_MODE = RETURN_ERRORS;
+
+
+No data is loaded — only error preview.
+Common interview question!
+
+⭐ 3.5 MATCH_BY_COLUMN_NAME
+
+Used when file column order is different.
+
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+⭐ 3.6 TRUNCATECOLUMNS
+
+Cuts data if column too long.
+
+TRUNCATECOLUMNS = TRUE;
+
+⭐ 3.7 FORCE = TRUE
+
+Loads files even if they were already loaded before.
+
+COPY INTO mytable FROM @stage FORCE = TRUE;
+
+
+Useful for test scenarios.
+
+⭐ 3.8 PURGE = TRUE
+
+Deletes files from stage after loading.
+
+Works ONLY for internal stages.
+
+PURGE = TRUE;
+
+⭐ 3.9 PURGE + External Stage (S3)
+
+❗ External stage does NOT support PURGE
+Snowflake cannot delete your S3 data unless you give PUT/DELETE permissions.
+
+⭐ 3.10 Loading from a query
+
+You can load the result of a SELECT directly into a stage/table.
+
+COPY INTO @mystage/unload_dir/
+FROM (
+    SELECT * FROM EMPLOYEES WHERE SALARY > 80000
+)
+FILE_FORMAT = (TYPE = CSV);
+
+🎯 4. COLUMN MAPPING (VERY IMPORTANT)
+Method 1 —
+
+Load by column order:
+
+COPY INTO EMPLOYEES
+FROM @stage/emp.csv;
+
+Method 2 —
+
+Load by explicit mapping:
+
+COPY INTO EMPLOYEES(EMP_ID, NAME, DEPARTMENT, SALARY)
+FROM @stage/emp.csv
+FILE_FORMAT = (TYPE = CSV);
+
+Method 3 —
+
+Use $1, $2, $3…
+
+COPY INTO employees
+FROM (
+  SELECT 
+    $1::NUMBER,
+    $2::STRING,
+    $3::STRING,
+    REPLACE($4, ',', '')::NUMBER
+  FROM @stage/file.csv
+)
+FILE_FORMAT = (TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='"');
+
+
+This is best practice when fields need transformations.
+
+🧪 5. COPY Data Transformations (must know)
+
+Snowflake allows transformations IN the COPY command:
+
+COPY INTO employees
+FROM (
+  SELECT
+    $1::NUMBER,
+    INITCAP($2),
+    UPPER($3),
+    REPLACE($4, ',', '')::NUMBER
+  FROM @stage/employees.csv
+)
+FILE_FORMAT = (TYPE = CSV);
+
+⚠️ 6. Handling Dirty CSV Data (Common Interview Topic)
+Example problem file:
+"Acme, Inc.", "Engineering", "85,000", "New York"
+
+Fix using transformations:
+SELECT
+  REGEXP_REPLACE($3, '[,"]', '')::NUMBER
+
+🛠️ 7. VALIDATION BEFORE LOAD
+
+Check errors before loading:
+
+COPY INTO mytable
+FROM @stage
+FILE_FORMAT = (TYPE = CSV)
+VALIDATION_MODE = RETURN_ERRORS;
+
+
+Return sample rows (preview):
+
+VALIDATION_MODE = RETURN_5_ROWS;
+
+📦 8. COPY INTO <location> → Unloading data
+
+To unload as CSV into stage:
+
+COPY INTO @my_csv_stage/export/employees/
+FROM employees
+FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER=',' HEADER=TRUE)
+OVERWRITE = TRUE;
+
+
+Unload as Parquet:
+
+COPY INTO @parquet_stage/out/
+FROM employees
+FILE_FORMAT = (TYPE = PARQUET);
+
+🔍 9. MONITORING COPY OPERATIONS (Certification Must-Know)
+9.1 COPY_HISTORY
+SELECT *
+FROM SNOWFLAKE.ACCOUNT_USAGE.COPY_HISTORY
+WHERE TABLE_NAME = 'EMPLOYEES'
+ORDER BY LAST_LOAD_TIME DESC;
+
+9.2 STAGE_FILE_HISTORY
+
+Shows file → load mapping
+
+SELECT * 
+FROM TABLE(INFORMATION_SCHEMA.STAGE_FILE_HISTORY(
+    stage_name => 'MY_DB.MY_SCHEMA.MY_STAGE'
+));
+
+9.3 COPY load stats (Query Profile)
+
+Look for:
+
+micro-partition pruning
+
+file sizes
+
+scanned files
+
+percentage from cache
+
+file parsing time
+
+🛑 10. ERROR HANDLING — One of the most tested topics
+Types of errors:
+
+Truncation errors
+
+Invalid numeric
+
+Malformed JSON
+
+Wrong column count
+
+Encoding issue
+
+Date mismatch
+
+You can fix with:
+
+✔ ON_ERROR = CONTINUE
+✔ NULL_IF
+✔ EMPTY_FIELD_AS_NULL
+✔ REPLACE($1, ',', '')::NUMBER
+✔ TRY_TO_NUMBER()
+✔ TRY_TO_DATE()
+
+Example:
+
+COPY INTO employees
+FROM (
+  SELECT
+    TRY_TO_NUMBER($4)
+  FROM @stage
+)
+ON_ERROR = CONTINUE;
+
+⚙️ 11. PERFORMANCE TUNING for COPY (Admin-Level)
+11.1 Use many small files
+
+Ideal: 50–250 MB compressed
+
+Avoid: many 1 KB files
+
+Avoid: 10 GB huge files
+
+Snowflake processes each file in parallel.
+
+11.2 Use internal stages for best speed
+
+Internal stages are faster than S3/GCS/Azure.
+
+11.3 Clustering does NOT affect COPY performance
+
+Clustering helps querying, not loading.
+
+11.4 Use AUTO_INGEST + Snowpipe for real-time ingestion
+
+COPY is best for batch load.
+
+11.5 Compress input files (GZIP, BZIP2, ZSTD)
+
+Snowflake automatically decompresses.
+
+📘 12. END-TO-END Example
+File on S3:
+1,John,Sales,85,000,New York
+
+Create integration:
+CREATE STORAGE INTEGRATION s3_int
+TYPE=EXTERNAL_STAGE
+STORAGE_PROVIDER=S3
+ENABLED=TRUE
+STORAGE_AWS_ROLE_ARN='arn:aws:iam::123:role/snow-role'
+STORAGE_ALLOWED_LOCATIONS=('s3://mybucket/snow/');
+
+Create stage:
+CREATE OR REPLACE STAGE my_s3_stage
+URL='s3://mybucket/snow/'
+STORAGE_INTEGRATION = s3_int
+FILE_FORMAT = (TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='"');
+
+Load with transformation:
+COPY INTO employees
+FROM (
+  SELECT 
+    $1::NUMBER,
+    $2::STRING,
+    $3::STRING,
+    REPLACE($4, ',', '')::NUMBER,
+    $5::STRING
+  FROM @my_s3_stage/employees.csv
+)
+FILE_FORMAT = (FORMAT_NAME='my_csv_ff')
+ON_ERROR = CONTINUE;
+
+⭐ Final: What Certification Expects You to Know
+
+You must know:
+
+🔹 How COPY parses files
+🔹 How to fix messy CSV/JSON
+🔹 How to validate before loading
+🔹 How ON_ERROR affects the load
+🔹 How MATCH_BY_COLUMN_NAME fixes column mismatch
+🔹 How Snowflake avoids duplicate loads
+🔹 How FORCE loads the file again
+🔹 Difference between Internal/External stages
+🔹 Monitoring using COPY_HISTORY
+🔹 Unload using COPY INTO stage
+🔹 Transformations INSIDE COPY
+🔹 File formatting rules
+🔹 Performance tuning

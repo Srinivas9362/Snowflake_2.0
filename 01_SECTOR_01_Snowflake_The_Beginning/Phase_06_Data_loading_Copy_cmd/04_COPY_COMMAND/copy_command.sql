@@ -1,0 +1,91 @@
+USE SCHEMA SECTOR_01.PHASE_01;
+
+COPY INTO <table_name>
+FROM <stage_path_or_query>
+FILE_FORMAT = (TYPE = CSV …)
+PATTERN = '.*.csv'
+ON_ERROR = CONTINUE
+PURGE = TRUE
+VALIDATION_MODE = RETURN_ERRORS
+FORCE = FALSE
+MATCH_BY_COLUMN_NAME = CASE_SENSITIVE
+TRUNCATECOLUMNS = TRUE
+NULL_IF = ('NULL','', 'N/A')
+EMPTY_FIELD_AS_NULL = TRUE
+FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+;
+
+
+copy into employees_02
+from @my_csv_stage/emp_double_quotes.csv
+VALIDATION_MODE = RETURN_ERRORS;
+
+
+COPY INTO employees_01
+FROM @my_csv_stage/employees.csv
+FORCE = TRUE;
+
+
+COPY INTO EMPLOYEES_01(EMP_ID, NAME, DEPARTMENT, SALARY)
+FROM @my_csv_stage/employees.csv
+FILE_FORMAT = (TYPE = CSV);
+
+
+COPY INTO EMPLOYEES_01
+FROM (
+  SELECT 
+    $1::NUMBER,
+    $2::STRING,
+    $3::STRING,
+    REPLACE($4, ',', '')::NUMBER
+  FROM @my_csv_stage/employees.csv
+)
+FILE_FORMAT = (TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='"');
+
+
+COPY INTO EMPLOYEES_02
+FROM @my_csv_stage/employees.csv
+FILE_FORMAT = (TYPE = CSV)
+VALIDATION_MODE = RETURN_5_ROWS;
+
+-- RETURN_ALL_ERRORS
+-- RETURN_n_ERRORS
+
+SELECT
+  REGEXP_REPLACE($3, '[,"]', '')::NUMBER;
+
+COPY INTO EMPLOYEES_02
+FROM @my_csv_stage/employees.csv
+FILE_FORMAT = (TYPE = CSV)
+VALIDATION_MODE = return_errors;
+
+COPY INTO @my_csv_stage/raw/
+FROM employees_01
+FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER=',')
+OVERWRITE = TRUE;
+
+COPY INTO @my_csv_stage/raw/parquet/
+FROM employees_01
+FILE_FORMAT = (TYPE = PARQUET);
+
+
+SELECT *
+FROM SNOWFLAKE.ACCOUNT_USAGE.COPY_HISTORY
+WHERE TABLE_NAME = 'EMPLOYEES_01'
+ORDER BY LAST_LOAD_TIME DESC;
+
+
+SELECT * from INFORMATION_SCHEMA.stages;
+
+COPY INTO employees_02
+FROM (
+  SELECT 
+    $1::NUMBER,
+    $2::STRING,
+    $3::STRING,
+    REPLACE($4, ',', '')::NUMBER,
+    $5::STRING
+  FROM @my_csv_stage/employees.csv
+)
+FILE_FORMAT = (TYPE = CSV)
+ON_ERROR = CONTINUE;

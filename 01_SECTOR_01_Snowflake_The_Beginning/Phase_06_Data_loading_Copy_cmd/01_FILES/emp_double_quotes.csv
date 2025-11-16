@@ -1,0 +1,6 @@
+emp_id,emp_name,department,salary,city
+1,"Acme, Inc.",Sales,75000,New York
+2,"John ""Johnny"" Carter",Finance,82000,Los Angeles
+3,Sara,Marketing,,San Francisco
+4, Michael  ,HR,90000,
+5,David,IT,"85,000",Chicago
