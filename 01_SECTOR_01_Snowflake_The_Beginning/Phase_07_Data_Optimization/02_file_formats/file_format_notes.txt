@@ -1,0 +1,181 @@
+============================================================
+✅ 7. FILE FORMATS — CSV, JSON, PARQUET, AVRO, ORC, XML
+============================================================
+
+Snowflake supports six major file formats which fall into two categories:
+
+🟦 A. Delimited Text Format (Row-Based)
+1️⃣ CSV (Comma-Separated Values)
+✔ Description
+
+Row-based
+
+Human-readable
+
+Widely used in ETL pipelines
+
+Requires consistent column count
+
+✔ Common Issues
+
+Extra commas
+
+Missing columns
+
+Data type mismatch
+
+Quoting problems
+
+✔ Sample CSV
+id,name,age,salary
+1,Ravi,25,55000
+2,Sneha,22,62000
+
+✔ Load CSV (Internal Stage Example)
+COPY INTO sector_01.phase_01.employee_csv
+FROM @internal_stage/csv/
+FILE_FORMAT = (TYPE=CSV SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='"');
+
+✔ Best Practices
+
+gzip-compress files
+
+keep file size 10MB–100MB
+
+set NULL_IF to handle null strings
+
+specify FIELD_OPTIONALLY_ENCLOSED_BY='"'
+
+🟩 B. Semi-Structured (VARIANT) Formats
+
+These formats load into Snowflake as VARIANT type, enabling flexible schema.
+
+2️⃣ JSON
+✔ Description
+
+Semi-structured
+
+Dynamic schema
+
+Used in APIs, IoT, logs
+
+✔ Sample JSON
+{"id":1,"name":"Ravi","skills":["python","sql"],"location":{"city":"Bangalore"}}
+
+✔ Load JSON
+CREATE OR REPLACE TABLE json_raw (data VARIANT);
+
+COPY INTO json_raw
+FROM @internal_stage/json/
+FILE_FORMAT = (TYPE = JSON STRIP_OUTER_ARRAY = TRUE);
+
+✔ Query JSON
+SELECT
+  data:id::int AS id,
+  data:name AS name,
+  data:skills[0] AS primary_skill,
+  data:location.city AS city
+FROM json_raw;
+
+✔ JSON Best Practices
+
+Always use VARIANT column
+
+Use STRIP_OUTER_ARRAY if file has […]
+
+Use FLATTEN() for nested arrays
+
+3️⃣ XML
+✔ Description
+
+Hierarchical format
+
+Used in banking, telecom, legacy systems
+
+✔ Sample XML
+<employee>
+    <id>1</id>
+    <name>Ravi</name>
+</employee>
+
+✔ Load XML
+CREATE OR REPLACE TABLE xml_raw (data VARIANT);
+
+COPY INTO xml_raw
+FROM @internal_stage/xml/
+FILE_FORMAT = (TYPE = XML);
+
+✔ Query XML
+SELECT
+   data:"id"::int AS id,
+   data:"name"::string AS name
+FROM xml_raw;
+
+🟨 C. Columnar (Binary) Formats
+
+These formats are optimized for analytics, support compression, and are splittable (parallel loads faster).
+
+4️⃣ PARQUET
+✔ Description
+
+Columnar
+
+Best for big data analytics
+
+Very fast COPY INTO
+
+Supports nested structures
+
+Auto-detects schema
+
+✔ Load PARQUET
+CREATE OR REPLACE TABLE parquet_raw (data VARIANT);
+
+COPY INTO parquet_raw
+FROM @internal_stage/parquet/
+FILE_FORMAT = (TYPE = PARQUET);
+
+✔ Query PARQUET
+SELECT data:key1, data:key2 FROM parquet_raw;
+
+✔ PARQUET Best Practices
+
+Best performance in Snowflake
+
+Preferred for analytical workloads
+
+Use INFER_SCHEMA() for auto schema detection
+
+5️⃣ AVRO
+✔ Description
+
+Row-based binary
+
+Supports schema evolution
+
+Widely used in Kafka/streaming
+
+Auto-schema detection in Snowflake
+
+✔ Load AVRO
+CREATE TABLE avro_raw (data VARIANT);
+
+COPY INTO avro_raw
+FROM @internal_stage/avro/
+FILE_FORMAT = (TYPE = AVRO);
+
+6️⃣ ORC
+✔ Description
+
+Columnar
+
+Used commonly in Hadoop
+
+Similar to Parquet
+
+✔ Load ORC
+CREATE TABLE orc_raw (data VARIANT);
+
+COPY INTO orc_raw
+FROM @internal_stage/orc/
+FILE_FORMAT = (TYPE = ORC);

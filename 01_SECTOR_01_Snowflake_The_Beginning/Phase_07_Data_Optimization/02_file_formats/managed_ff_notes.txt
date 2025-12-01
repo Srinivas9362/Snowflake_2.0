@@ -1,0 +1,120 @@
+============================================================
+✅ 8. CREATE & MANAGE FILE FORMATS
+============================================================
+
+A FILE FORMAT defines how Snowflake interprets files during loading.
+
+🟢 8.1 WHY USE FILE FORMAT OBJECTS?
+
+✔ Reusability
+✔ Centralized governance
+✔ Consistency
+✔ Easier COPY INTO commands
+✔ Required for Snowpipe & External Tables
+
+🧱 8.2 CREATE FILE FORMAT (CSV EXAMPLE)
+CREATE OR REPLACE FILE FORMAT ff_csv_basic
+TYPE = CSV
+FIELD_DELIMITER = ','
+SKIP_HEADER = 1
+FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+TRIM_SPACE = TRUE
+NULL_IF = ('NULL', 'N/A', '')
+EMPTY_FIELD_AS_NULL = TRUE;
+
+🧵 USE FILE FORMAT with COPY INTO
+COPY INTO employee_csv
+FROM @internal_stage/csv_files/
+FILE_FORMAT = ff_csv_basic;
+
+🟦 8.3 CREATE FILE FORMAT (JSON EXAMPLE)
+CREATE OR REPLACE FILE FORMAT ff_json
+TYPE = JSON
+STRIP_OUTER_ARRAY = TRUE
+COMPRESSION = AUTO;
+
+Use it:
+COPY INTO json_raw
+FROM @internal_stage/json_files/
+FILE_FORMAT = ff_json;
+
+🟨 8.4 CREATE FILE FORMAT (PARQUET Example)
+CREATE OR REPLACE FILE FORMAT ff_parquet
+TYPE = PARQUET
+COMPRESSION = SNAPPY;
+
+🟣 8.5 Alter File Format
+ALTER FILE FORMAT ff_csv_basic
+SET FIELD_DELIMITER = '|';
+
+🔥 8.6 SHOW + DESCRIBE FILE FORMATS
+SHOW FILE FORMATS;
+
+DESCRIBE FILE FORMAT ff_json;
+
+🧹 8.7 DROP FILE FORMAT
+DROP FILE FORMAT ff_parquet;
+
+============================================================
+⭐ REAL-TIME MINI PROJECT (INTERNAL STAGE ONLY)
+============================================================
+
+Let's simulate a real data engineering load.
+
+🎯 Step 1 — Create Stage
+CREATE OR REPLACE STAGE sector_stage;
+
+🎯 Step 2 — Upload Files
+
+(Place sample files into your folder → use PUT)
+
+PUT file:///"D:\Snowflake_Training\csv\*.csv" @sector_stage/csv/ AUTO_COMPRESS=TRUE;
+PUT file:///"D:\Snowflake_Training\json\*.json" @sector_stage/json/;
+PUT file:///"D:\Snowflake_Training\parquet\*.parquet" @sector_stage/parquet/;
+
+🎯 Step 3 — Create File Formats
+CREATE FILE FORMAT ff_csv TYPE=CSV SKIP_HEADER=1;
+CREATE FILE FORMAT ff_json TYPE=JSON;
+CREATE FILE FORMAT ff_parquet TYPE=PARQUET;
+
+🎯 Step 4 — Load CSV
+COPY INTO csv_raw
+FROM @sector_stage/csv/
+FILE_FORMAT = ff_csv;
+
+🎯 Step 5 — Load JSON
+COPY INTO json_raw
+FROM @sector_stage/json/
+FILE_FORMAT = ff_json;
+
+🎯 Step 6 — Load PARQUET
+COPY INTO parquet_raw
+FROM @sector_stage/parquet/
+FILE_FORMAT = ff_parquet;
+
+============================================================
+🎓 ADVANCED INTERVIEW POINTS
+============================================================
+❓Which file format loads fastest in Snowflake?
+
+➡ PARQUET (columnar + compressed)
+
+❓Which formats load into VARIANT columns?
+
+➡ JSON, XML, PARQUET, AVRO, ORC
+
+❓Why use FILE FORMAT objects?
+
+➡ Governance, consistency, reuse, Snowpipe
+
+❓What is STRIP_OUTER_ARRAY?
+
+➡ Removes [ ] so JSON loads cleanly row by row
+
+❓Can Snowflake infer schema from Parquet?
+
+➡ YES (but not from CSV)
+
+❓What is the preferred ingestion format?
+
+➡ PARQUET (analytics), JSON (API logs), CSV (traditional ETL)
