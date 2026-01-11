@@ -57,7 +57,9 @@ Snowflake supplies the AWS account and external ID to use for the trust. For a g
 }
 
 
-Important: Snowflake gives you STORAGE_AWS_EXTERNAL_ID and STORAGE_AWS_IAM_USER_ARN or STORAGE_AWS_ROLE_ARN values when you create the storage integration. Use those to set the trust policy precisely. See Snowflake docs for the exact values for your account/region.
+Important: Snowflake gives you STORAGE_AWS_EXTERNAL_ID and STORAGE_AWS_IAM_USER_ARN or 
+STORAGE_AWS_ROLE_ARN values when you create the storage integration. 
+Use those to set the trust policy precisely. See Snowflake docs for the exact values for your account/region.
 
 Step B — Create the Storage Integration in Snowflake
 
